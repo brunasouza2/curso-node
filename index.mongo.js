@@ -93,16 +93,6 @@ async function main(){
          */
 
         if(commander.listar){
-            let filtro = {}
-            if(heroi.nome){
-
-                filtro = { 
-                    nome: { 
-                        $regex: `.*${heroi.nome}*.`, 
-                        $options: 'i' }
-                    }
-            }
-
             const herois = await dbMongo.listar(filtro)
             console.log('herois', JSON.stringify(herois))
             process.exit(0)
