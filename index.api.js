@@ -22,9 +22,16 @@
  * 
  * npm i hapi
  * 
+ * para evitar ficar fazendo ifs, validando na mão
+ * podemos trabalhar com schemas de validação onde validamos o pedido primeiro antes de 
+ * passar pelo nosso HANDLER
+ * 
+ * npm i joi
+ * 
  */
 
 const Hapi = require('hapi')
+const Joi = require('joi')
 const Db = require('./src/heroiDb')
 const app = new Hapi.Server({
     port:3000
@@ -38,14 +45,53 @@ async function main(){
        app.route([
            {
                // localhost:3000/v1/herois?nome=flash
+               // localhost:3000/v1/herois?skip=1&limit=1
                path: '/v1/herois',
                method: 'GET',
+               config:{
+                   validate: {
+                       failAction: (request, h, err) =>{
+                           throw err   
+                       },
+                       query: {
+                           nome: Joi.string().max(10).min(2),
+                           skip: Joi.number().default(0),
+                           limit: Joi.number().max(10).default(10)
+                       }
+                   }
+               },
                handler: async (request) => {
                    try{
                        const {query} = request
-                       return database.listar(query)
+                       const {skip, limit} = query
+                       return database.listar(query, parseInt(skip), parseInt(limit))
                    }catch(error){
                        console.error('DEU RUIM', e)
+                   }
+               }
+           },
+           {
+               path: '/v1/herois',
+               method: 'POST',
+               config: {
+                   validate: {
+                       failAction: (r, h, erro) => {
+                           throw erro
+                       },
+                       payload: {
+                           nome: Joi.string().max(10).required(),
+                           idade: Joi.number().min(18).required(),
+                           poder: Joi.string().max(10).required()
+                       }
+                   }
+               },
+               handler: async (request) => {
+                   try {
+                       const {payload} = request
+                       return database.cadastrar(payload)
+                   } catch (error) {
+                       console.error('DEU RUIM', error)
+                       return null
                    }
                }
            }
