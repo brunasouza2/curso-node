@@ -28,10 +28,20 @@
  * 
  * npm i joi
  * 
+ * npm i hapi-swagger@9.1.3 inert vision
+ * 
+ * para padronizar status de operação das APIs usamos o Boom
+ * npm i bomm
+ * 
  */
 
 const Hapi = require('hapi')
 const Joi = require('joi')
+const HapiSwagger = require('hapi-swagger')
+const Vision = require('vision')
+const Inert = require('inert')
+const Boom = require('boom')
+const { ObjectId } = require('mongodb')
 const Db = require('./src/heroiDb')
 const app = new Hapi.Server({
     port:3000
@@ -42,6 +52,22 @@ async function main(){
        const database = new Db()
        await database.connect()
 
+       await app.register([
+           Inert,
+           Vision,
+           {
+               plugin: HapiSwagger,
+               options: {
+                   documentationPath: '/v1/documentation',
+                   info: {
+                       title: 'API Heroes - Bruna',
+                       version: 'v1.0'
+                   },
+                   lang: 'pt'
+               }
+           }
+       ])
+
        app.route([
            {
                // localhost:3000/v1/herois?nome=flash
@@ -49,6 +75,9 @@ async function main(){
                path: '/v1/herois',
                method: 'GET',
                config:{
+                   tags: [ 'api' ],
+                   description: 'Listar Herois',
+                   notes: 'Pode filtrar por nome e paginar',
                    validate: {
                        failAction: (request, h, err) =>{
                            throw err   
@@ -66,7 +95,8 @@ async function main(){
                        const {skip, limit} = query
                        return database.listar(query, parseInt(skip), parseInt(limit))
                    }catch(error){
-                       console.error('DEU RUIM', e)
+                       console.error('DEU RUIM', error)
+                       return Boom.internal();
                    }
                }
            },
@@ -74,6 +104,9 @@ async function main(){
                path: '/v1/herois',
                method: 'POST',
                config: {
+                   tags: [ 'api' ],
+                   description: 'Cadastrar Herois',
+                   notes: 'Pode cadastrar por nome, idade e poder',
                    validate: {
                        failAction: (r, h, erro) => {
                            throw erro
@@ -91,7 +124,66 @@ async function main(){
                        return database.cadastrar(payload)
                    } catch (error) {
                        console.error('DEU RUIM', error)
-                       return null
+                       return Boom.internal();
+                   }
+               }
+           },
+           {
+               path: '/v1/herois/{id}',
+               method: 'DELETE',
+               config: {                    
+                   tags: [ 'api' ],
+                   description: 'Remover Herois',
+                   notes: 'Remove por id',
+                   validate : {
+                       failAction: (request, h, err) =>{
+                           throw err   
+                       },
+                       params: {
+                           id: Joi.string().max(40).required()
+                       }
+                   }
+               },
+               async handler(request) {
+                   try {
+                       const { id } = request.params
+                       return database.remover(ObjectId(id))
+                   } catch (error) {
+                       console.log('DEU RUIM', error);
+                       return Boom.internal();
+                   }
+               }
+           },
+           {
+               path: '/v1/herois/{id}',
+               method: 'PATCH',
+               config: {
+                   tags: [ 'api' ],
+                   description: 'Atualizar Herois',
+                   notes: 'atualizar heroi por id',
+                   validate: {
+                       failAction (r, h, error){
+                           throw error
+                       },
+                       params: {
+                           id: Joi.string().max(40).required()
+                       },
+                       payload: {
+                           nome: Joi.string().max(20).min(2),
+                           poder: Joi.string().max(20).min(2),
+                           idade: Joi.number().min(18)
+                       }
+                   }
+               },
+               async handler (request, h) {
+                   try {
+                       const { id } = request.params
+                       const { payload } = request
+                       const v = database.atualizar(ObjectId(id),payload)
+                       return h.response(v).code(201)
+                   } catch (error) {
+                       console.log('DEU RUIM', error)
+                       return Boom.internal();
                    }
                }
            }
@@ -101,7 +193,8 @@ async function main(){
        console.log(`servidor rodando ${app.info.host}:${app.info.port}`)
 
    }catch(error){
-       console.error('DEU RUIM', e)
+       console.error('DEU RUIM', error)
+       return Boom.internal();
    }
 }
 
