@@ -27,10 +27,12 @@ class HeroiDB {
 
     async connect() {
         // localhost:27017/dbName
-        const mongodbString = 'mongodb://localhost:27017/heroi'
-        const mongoClient = new MongoClient(mongodbString, {userNewUrlParser: true})
+        const mongodbString = process.env.MONGO_URI
+        const mongoClient = new MongoClient(mongodbString, {useNewUrlParser: true})
         const connection = await mongoClient.connect()
-        const heroiCollection = await connection.db('caracteres').collection('heroi')
+        const heroiCollection = await connection
+        .db(process.env.MONGO_DATABASE)
+        .collection(process.env.MONGO_COLLECTION)
         this.heroiCollection = heroiCollection
     }
 
@@ -38,8 +40,17 @@ class HeroiDB {
         return this.heroiCollection.insertOne(heroi)
     }
 
-    async listar(filtro) {
-        return this.heroiCollection.find(filtro).toArray()
+    async listar(heroi, skip=0, limit=10) {
+        let filtro = {}
+        if(heroi.nome){
+
+            filtro = { 
+                nome: { 
+                    $regex: `.*${heroi.nome}*.`, 
+                    $options: 'i' }
+                }
+        }
+        return this.heroiCollection.find(filtro).skip(skip).limit(limit).toArray()
     }
 
     async remover(id) {
